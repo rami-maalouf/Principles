@@ -10,9 +10,12 @@ import SwiftData
 
 @main
 struct PrinciplesApp: App {
+    @StateObject private var themeStore = ThemeStore()
+
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Item.self,
+            Principle.self,
+            PrincipleCheckIn.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
@@ -26,6 +29,8 @@ struct PrinciplesApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environmentObject(themeStore)
+                .preferredColorScheme(themeStore.preferredColorScheme)
         }
         .modelContainer(sharedModelContainer)
     }

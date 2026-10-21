@@ -17,9 +17,15 @@ struct ContentView: View {
         TabView(selection: $selectedTab) {
             TrackerHomeScreen()
                 .tabItem {
-                    Label("Principles", systemImage: "sparkles.rectangle.stack")
+                    Label("Principles", systemImage: "list.bullet.rectangle.portrait")
                 }
                 .tag(RootTab.tracker)
+
+            MetricsScreen()
+                .tabItem {
+                    Label("Metrics", systemImage: "chart.bar.xaxis")
+                }
+                .tag(RootTab.metrics)
 
             ArchiveScreen()
                 .tabItem {
@@ -39,6 +45,7 @@ struct ContentView: View {
 
 private enum RootTab: Hashable {
     case tracker
+    case metrics
     case archive
     case settings
 }
@@ -74,35 +81,21 @@ private struct TrackerHomeScreen: View {
         PrincipleAnalytics.timelineDates(count: themeStore.visibleHistoryDays)
     }
 
-    private var completedTodayCount: Int {
-        activePrinciples.filter { $0.analytics().completedToday }.count
-    }
-
-    private var bestCurrentStreak: Int {
-        activePrinciples.map { $0.analytics().currentStreak }.max() ?? 0
-    }
-
-    private var graduatedCount: Int {
-        principles.filter { $0.hasGraduated || $0.analytics().hasGraduated }.count
-    }
-
     var body: some View {
         NavigationStack {
             ZStack {
                 AtmosphereBackground(palette: palette)
 
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        heroCard
-
-                        if activePrinciples.isEmpty {
-                            emptyState
-                        } else {
-                            trackerCard
-                        }
+                if activePrinciples.isEmpty {
+                    emptyState
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 16)
+                } else {
+                    ScrollView {
+                        compactBoard
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 16)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 16)
                 }
             }
             .navigationTitle("Principles")
@@ -126,116 +119,30 @@ private struct TrackerHomeScreen: View {
         }
     }
 
-    private var heroCard: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Make each principle real for 21 straight days.")
-                        .font(.system(size: 31, weight: .semibold, design: .serif))
-                        .foregroundStyle(palette.textPrimary)
+    private var compactBoard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            TrackerHeaderRow(
+                dates: timelineDates,
+                palette: palette
+            )
+            .padding(.bottom, 10)
 
-                    Text("Each check-in moves a belief from intention to identity. When it survives 21 days in a row, it graduates into the archive.")
-                        .font(.system(size: 15, weight: .medium, design: .rounded))
-                        .foregroundStyle(palette.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Spacer(minLength: 20)
-
-                ZStack {
-                    Circle()
-                        .fill(palette.accentSoft)
-                        .frame(width: 82, height: 82)
-                        .blur(radius: 0.2)
-
-                    Circle()
-                        .stroke(palette.accent.opacity(0.35), lineWidth: 1.5)
-                        .frame(width: 92, height: 92)
-
-                    VStack(spacing: 3) {
-                        Text("\(bestCurrentStreak)")
-                            .font(.system(size: 30, weight: .bold, design: .monospaced))
-                            .foregroundStyle(palette.textPrimary)
-                            .monospacedDigit()
-
-                        Text("best")
-                            .font(.system(size: 11, weight: .semibold, design: .rounded))
-                            .foregroundStyle(palette.textMuted)
-                            .textCase(.uppercase)
+            ForEach(Array(activePrinciples.enumerated()), id: \.element.id) { index, principle in
+                PrincipleTrackerRow(
+                    principle: principle,
+                    dates: timelineDates,
+                    palette: palette,
+                    onToggleDate: { date in
+                        toggle(date, for: principle)
                     }
-                }
-                .shadow(color: palette.accentGlow.opacity(0.28), radius: 22, y: 8)
-            }
-
-            HStack(spacing: 12) {
-                SummaryChip(
-                    title: "Active",
-                    value: "\(activePrinciples.count)",
-                    icon: "circle.grid.2x2.fill",
-                    palette: palette
                 )
-                SummaryChip(
-                    title: "Today",
-                    value: "\(completedTodayCount)",
-                    icon: "checkmark.seal.fill",
-                    palette: palette
-                )
-                SummaryChip(
-                    title: "Graduated",
-                    value: "\(graduatedCount)",
-                    icon: "archivebox.fill",
-                    palette: palette
-                )
-            }
-        }
-        .principlePanel(palette, glow: true)
-    }
 
-    private var trackerCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .bottom) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Daily Ledger")
-                        .font(.system(size: 24, weight: .semibold, design: .serif))
-                        .foregroundStyle(palette.textPrimary)
-
-                    Text("The most recent date stays on the far right, just like Loop.")
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(palette.textMuted)
+                if index < activePrinciples.count - 1 {
+                    Rectangle()
+                        .fill(palette.border)
+                        .frame(height: 1)
+                        .padding(.vertical, 2)
                 }
-
-                Spacer()
-
-                Text("\(themeStore.visibleHistoryDays) days")
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
-                    .foregroundStyle(palette.accent)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(
-                        Capsule(style: .continuous)
-                            .fill(palette.accentSoft)
-                    )
-            }
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 12) {
-                    TrackerHeaderRow(
-                        dates: timelineDates,
-                        palette: palette
-                    )
-
-                    ForEach(activePrinciples) { principle in
-                        PrincipleTrackerRow(
-                            principle: principle,
-                            dates: timelineDates,
-                            palette: palette,
-                            onToggleToday: {
-                                toggleToday(for: principle)
-                            }
-                        )
-                    }
-                }
-                .padding(.vertical, 4)
             }
         }
         .principlePanel(palette)
@@ -243,13 +150,13 @@ private struct TrackerHomeScreen: View {
 
     private var emptyState: some View {
         ContentUnavailableView {
-            Label("No principles yet", systemImage: "sparkles")
+            Label("No principles yet", systemImage: "list.bullet.rectangle")
                 .foregroundStyle(palette.textPrimary)
         } description: {
-            Text("Start with one principle you want to embody daily. The home screen will become your streak board.")
+            Text("Create a principle to start the tracker.")
                 .foregroundStyle(palette.textSecondary)
         } actions: {
-            Button("Create your first principle") {
+            Button("New Principle") {
                 isPresentingComposer = true
             }
             .buttonStyle(.borderedProminent)
@@ -260,10 +167,226 @@ private struct TrackerHomeScreen: View {
         .principlePanel(palette)
     }
 
-    private func toggleToday(for principle: Principle) {
+    private func toggle(_ date: Date, for principle: Principle) {
         withAnimation(.spring(response: 0.35, dampingFraction: 0.84)) {
-            toggleCheckIn(for: principle, using: modelContext)
+            toggleCheckIn(for: principle, using: modelContext, date: date)
         }
+    }
+}
+
+private struct MetricsScreen: View {
+    @Environment(\.colorScheme) private var colorScheme
+    @EnvironmentObject private var themeStore: ThemeStore
+    @Query(sort: \Principle.updatedAt, order: .reverse) private var principles: [Principle]
+
+    private var palette: ThemePalette {
+        themeStore.palette(for: colorScheme)
+    }
+
+    private var activePrinciples: [Principle] {
+        principles.filter { !$0.isArchived }
+    }
+
+    private var principleStats: [(principle: Principle, stats: PrincipleAnalyticsSnapshot)] {
+        activePrinciples.map { ($0, $0.analytics()) }
+    }
+
+    private var completedTodayCount: Int {
+        principleStats.filter(\.stats.completedToday).count
+    }
+
+    private var graduatedCount: Int {
+        principles.filter { $0.hasGraduated || $0.analytics().hasGraduated }.count
+    }
+
+    private var archivedCount: Int {
+        principles.filter(\.isArchived).count
+    }
+
+    private var aggregateCompletionRate: Int {
+        let totalCheckIns = principleStats.reduce(0) { $0 + $1.stats.totalCheckIns }
+        let totalActiveDays = principleStats.reduce(0) { $0 + $1.stats.activeDayCount }
+        guard totalActiveDays > 0 else {
+            return 0
+        }
+
+        return Int((Double(totalCheckIns) / Double(totalActiveDays) * 100).rounded())
+    }
+
+    private var topStreakPrinciples: [(principle: Principle, stats: PrincipleAnalyticsSnapshot)] {
+        principleStats
+            .sorted {
+                if $0.stats.currentStreak == $1.stats.currentStreak {
+                    return $0.principle.updatedAt > $1.principle.updatedAt
+                }
+
+                return $0.stats.currentStreak > $1.stats.currentStreak
+            }
+    }
+
+    private var sevenDayMetrics: [PrinciplesDailyMetric] {
+        let dates = PrincipleAnalytics.timelineDates(count: 7)
+        let total = activePrinciples.count
+
+        return dates.map { date in
+            let completed = activePrinciples.reduce(into: 0) { result, principle in
+                if principle.checkIns.contains(where: { Calendar.current.isDate($0.day, inSameDayAs: date) }) {
+                    result += 1
+                }
+            }
+
+            return PrinciplesDailyMetric(date: date, completedCount: completed, totalCount: total)
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                AtmosphereBackground(palette: palette)
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        overviewGrid
+                        weeklyTrendCard
+                        streakBoard
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 16)
+                }
+            }
+            .navigationTitle("Metrics")
+            .navigationDestination(for: Principle.self) { principle in
+                PrincipleDetailView(principle: principle)
+                    .environmentObject(themeStore)
+            }
+        }
+    }
+
+    private var overviewGrid: some View {
+        LazyVGrid(
+            columns: [
+                GridItem(.flexible(), spacing: 12),
+                GridItem(.flexible(), spacing: 12)
+            ],
+            spacing: 12
+        ) {
+            MetricsSummaryTile(
+                icon: "square.stack.3d.up.fill",
+                title: "Active",
+                value: "\(activePrinciples.count)",
+                detail: "\(archivedCount) archived",
+                palette: palette
+            )
+            MetricsSummaryTile(
+                icon: "checkmark.circle.fill",
+                title: "Today",
+                value: activePrinciples.isEmpty ? "0" : "\(completedTodayCount)/\(activePrinciples.count)",
+                detail: "checked in",
+                palette: palette
+            )
+            MetricsSummaryTile(
+                icon: "chart.line.uptrend.xyaxis",
+                title: "Consistency",
+                value: "\(aggregateCompletionRate)%",
+                detail: "all active days",
+                palette: palette
+            )
+            MetricsSummaryTile(
+                icon: "archivebox.fill",
+                title: "Graduated",
+                value: "\(graduatedCount)",
+                detail: "finished 21-day runs",
+                palette: palette
+            )
+        }
+    }
+
+    private var weeklyTrendCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Label("Last 7 days", systemImage: "calendar")
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .foregroundStyle(palette.textPrimary)
+
+                Spacer()
+
+                Text(activePrinciples.isEmpty ? "0" : "\(completedTodayCount) today")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundStyle(palette.textMuted)
+            }
+
+            HStack(alignment: .bottom, spacing: 10) {
+                ForEach(sevenDayMetrics) { metric in
+                    VStack(spacing: 8) {
+                        ZStack(alignment: .bottom) {
+                            Capsule(style: .continuous)
+                                .fill(palette.surface)
+
+                            Capsule(style: .continuous)
+                                .fill(metric.completedCount == 0 ? palette.surfaceMuted : palette.accent)
+                                .frame(height: max(10, metric.ratio * 76))
+                        }
+                        .frame(height: 76)
+
+                        Text(metric.date.formatted(.dateTime.weekday(.narrow)))
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .foregroundStyle(metric.isToday ? palette.accent : palette.textMuted)
+
+                        Text("\(metric.completedCount)")
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .foregroundStyle(palette.textSecondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+        }
+        .principlePanel(palette)
+    }
+
+    private var streakBoard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Label("Current streaks", systemImage: "flame.fill")
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .foregroundStyle(palette.textPrimary)
+
+                Spacer()
+            }
+
+            if topStreakPrinciples.isEmpty {
+                Text("No active principles.")
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(palette.textMuted)
+            } else {
+                ForEach(Array(topStreakPrinciples.prefix(6).enumerated()), id: \.element.principle.id) { index, entry in
+                    NavigationLink(value: entry.principle) {
+                        HStack(spacing: 12) {
+                            Text(entry.principle.title)
+                                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                .foregroundStyle(palette.textPrimary)
+                                .lineLimit(1)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+
+                            HStack(spacing: 4) {
+                                Image(systemName: "flame.fill")
+                                Text("\(entry.stats.currentStreak)")
+                                    .monospacedDigit()
+                            }
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .foregroundStyle(entry.stats.currentStreak > 0 ? palette.accent : palette.textMuted)
+                        }
+                    }
+                    .buttonStyle(.plain)
+
+                    if index < min(topStreakPrinciples.count, 6) - 1 {
+                        Rectangle()
+                            .fill(palette.border)
+                            .frame(height: 1)
+                    }
+                }
+            }
+        }
+        .principlePanel(palette)
     }
 }
 
@@ -415,44 +538,23 @@ private struct SettingsScreen: View {
                 .font(.system(size: 24, weight: .semibold, design: .serif))
                 .foregroundStyle(livePalette.textPrimary)
 
-            Text("Adjust the theme and accent colors until the tracker feels like your own private operating system.")
+            Text("Preview the compact tracker row.")
                 .font(.system(size: 14, weight: .medium, design: .rounded))
                 .foregroundStyle(livePalette.textSecondary)
 
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 12) {
-                    TodayOrb(
-                        isCompleted: true,
-                        palette: previewPalette
-                    )
+            VStack(alignment: .leading, spacing: 0) {
+                TrackerHeaderRow(
+                    dates: samplePreviewStates.map(\.date),
+                    palette: previewPalette
+                )
+                .padding(.bottom, 10)
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Tell the truth early")
-                            .font(.system(size: 20, weight: .semibold, design: .serif))
-                            .foregroundStyle(previewPalette.textPrimary)
-
-                        Text("12 day streak")
-                            .font(.system(size: 12, weight: .bold, design: .monospaced))
-                            .foregroundStyle(previewPalette.accent)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(
-                                Capsule(style: .continuous)
-                                    .fill(previewPalette.accentSoft)
-                            )
-                    }
-
-                    Spacer()
-                }
-
-                HStack(spacing: 6) {
-                    ForEach(samplePreviewStates) { state in
-                        TrackerDayCell(
-                            state: state,
-                            palette: previewPalette
-                        )
-                    }
-                }
+                CompactPreviewRow(
+                    title: "Tell the truth early",
+                    streak: 12,
+                    states: samplePreviewStates,
+                    palette: previewPalette
+                )
             }
             .principlePanel(previewPalette, glow: true)
         }
@@ -514,18 +616,18 @@ private struct SettingsScreen: View {
 
     private var trackerSettingsCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Tracker Strip")
+            Text("Home Strip")
                 .font(.system(size: 22, weight: .semibold, design: .serif))
                 .foregroundStyle(livePalette.textPrimary)
 
             Picker("Visible days", selection: $themeStore.visibleHistoryDays) {
                 ForEach(themeStore.historyOptions, id: \.self) { days in
-                    Text("\(days) days").tag(days)
+                    Text("\(days)").tag(days)
                 }
             }
             .pickerStyle(.segmented)
 
-            Text("Choose how much recent history appears on the home matrix.")
+            Text("Choose how many recent days stay visible on the home board.")
                 .font(.system(size: 13, weight: .medium, design: .rounded))
                 .foregroundStyle(livePalette.textMuted)
         }
@@ -533,13 +635,13 @@ private struct SettingsScreen: View {
     }
 
     private var samplePreviewStates: [PrincipleDayState] {
-        let dates = PrincipleAnalytics.timelineDates(count: 14)
+        let dates = PrincipleAnalytics.timelineDates(count: 5)
         return dates.enumerated().map { index, date in
             PrincipleDayState(
                 id: date,
                 date: date,
-                isCompleted: [1, 2, 4, 5, 6, 8, 9, 10, 12, 13].contains(index),
-                isToday: index == 13
+                isCompleted: [0, 2, 3, 4].contains(index),
+                isToday: index == 4
             )
         }
     }
@@ -992,22 +1094,18 @@ private struct TrackerHeaderRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Text("Principle")
-                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                .foregroundStyle(palette.textMuted)
-                .textCase(.uppercase)
-                .frame(width: 248, alignment: .leading)
+            Spacer(minLength: 0)
 
             HStack(spacing: 6) {
                 ForEach(dates, id: \.self) { date in
-                    VStack(spacing: 4) {
+                    VStack(spacing: 3) {
                         Text(date.formatted(.dateTime.weekday(.narrow)))
-                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .font(.system(size: 9, weight: .bold, design: .monospaced))
                             .foregroundStyle(palette.textMuted)
 
                         Text(date.formatted(.dateTime.day()))
-                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(palette.textSecondary)
+                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(date == dates.last ? palette.accent : palette.textSecondary)
                     }
                     .frame(width: 24)
                 }
@@ -1020,7 +1118,7 @@ private struct PrincipleTrackerRow: View {
     let principle: Principle
     let dates: [Date]
     let palette: ThemePalette
-    let onToggleToday: () -> Void
+    let onToggleDate: (Date) -> Void
 
     private var stats: PrincipleAnalyticsSnapshot {
         principle.analytics()
@@ -1035,88 +1133,42 @@ private struct PrincipleTrackerRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Button(action: onToggleToday) {
-                TodayOrb(
-                    isCompleted: stats.completedToday,
-                    palette: palette
-                )
-            }
-            .buttonStyle(.plain)
-
             NavigationLink(value: principle) {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(alignment: .firstTextBaseline, spacing: 10) {
-                        Text(principle.title)
-                            .font(.system(size: 21, weight: .semibold, design: .serif))
-                            .foregroundStyle(palette.textPrimary)
-                            .lineLimit(1)
+                HStack(spacing: 8) {
+                    Text(principle.title)
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(palette.textPrimary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
-                        statusChip
+                    HStack(spacing: 4) {
+                        Image(systemName: stats.currentStreak > 0 ? "flame.fill" : "flame")
+                        Text("\(stats.currentStreak)")
+                            .monospacedDigit()
                     }
-
-                    Text(principle.principleDescription)
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(palette.textSecondary)
-                        .lineLimit(2)
-
-                    HStack(spacing: 8) {
-                        MetricPill(
-                            title: "\(stats.currentStreak) day streak",
-                            accent: palette.accent,
-                            fill: palette.accentSoft,
-                            foreground: palette.textPrimary
-                        )
-
-                        MetricPill(
-                            title: stats.hasGraduated
-                                ? "graduated"
-                                : "\(stats.remainingToGraduate) left",
-                            accent: palette.textMuted,
-                            fill: palette.surface,
-                            foreground: palette.textSecondary
-                        )
-                    }
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundStyle(stats.currentStreak > 0 ? palette.accent : palette.textMuted)
                 }
-                .frame(width: 190, alignment: .leading)
             }
             .buttonStyle(.plain)
 
             HStack(spacing: 6) {
                 ForEach(states) { state in
-                    TrackerDayCell(
-                        state: state,
-                        palette: palette
-                    )
+                    Button {
+                        onToggleDate(state.date)
+                    } label: {
+                        TrackerDayCell(
+                            state: state,
+                            palette: palette,
+                            showsCheckmark: true
+                        )
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
-        .padding(.vertical, 8)
-    }
-
-    private var statusStyle: (title: String, fill: Color, foreground: Color) {
-        if stats.hasGraduated {
-            ("Graduated", palette.accentSoft, palette.accent)
-        } else if stats.completedToday {
-            ("On track", palette.accentSoft, palette.accent)
-        } else if stats.completedYesterday {
-            ("Protect today", palette.surface, palette.warning)
-        } else {
-            ("Restart", palette.surface, palette.textMuted)
-        }
-    }
-
-    private var statusChip: some View {
-        let style = statusStyle
-
-        return Text(style.title)
-            .font(.system(size: 11, weight: .bold, design: .monospaced))
-            .foregroundStyle(style.foreground)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(style.fill)
-            )
+        .padding(.vertical, 10)
     }
 }
 
@@ -1177,29 +1229,40 @@ private struct ArchiveCard: View {
     }
 }
 
-private struct TodayOrb: View {
-    let isCompleted: Bool
+private struct CompactPreviewRow: View {
+    let title: String
+    let streak: Int
+    let states: [PrincipleDayState]
     let palette: ThemePalette
 
     var body: some View {
-        ZStack {
-            Circle()
-                .fill(isCompleted ? palette.accent : palette.surface)
-                .frame(width: 40, height: 40)
+        HStack(spacing: 12) {
+            HStack(spacing: 8) {
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(palette.textPrimary)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
-            Circle()
-                .stroke(isCompleted ? palette.accentGlow.opacity(0.7) : palette.border, lineWidth: 1.5)
-                .frame(width: 48, height: 48)
+                HStack(spacing: 4) {
+                    Image(systemName: "flame.fill")
+                    Text("\(streak)")
+                        .monospacedDigit()
+                }
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundStyle(palette.accent)
+            }
 
-            Image(systemName: isCompleted ? "checkmark" : "plus")
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(isCompleted ? Color.black.opacity(0.72) : palette.textSecondary)
+            HStack(spacing: 6) {
+                ForEach(states) { state in
+                    TrackerDayCell(
+                        state: state,
+                        palette: palette,
+                        showsCheckmark: true
+                    )
+                }
+            }
         }
-        .shadow(
-            color: isCompleted ? palette.accentGlow.opacity(0.35) : Color.black.opacity(0.08),
-            radius: 16,
-            y: 6
-        )
     }
 }
 
@@ -1207,6 +1270,7 @@ private struct TrackerDayCell: View {
     let state: PrincipleDayState
     let palette: ThemePalette
     var size: CGFloat = 24
+    var showsCheckmark = false
 
     var body: some View {
         RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -1221,11 +1285,77 @@ private struct TrackerDayCell: View {
                         lineWidth: state.isToday ? 1.6 : 1
                     )
             )
+            .overlay {
+                if showsCheckmark && state.isCompleted {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: size * 0.44, weight: .bold))
+                        .foregroundStyle(Color.black.opacity(0.72))
+                }
+            }
             .shadow(
                 color: state.isCompleted ? palette.accentGlow.opacity(state.isToday ? 0.34 : 0.16) : .clear,
                 radius: state.isToday ? 12 : 6,
                 y: state.isToday ? 4 : 2
             )
+    }
+}
+
+private struct MetricsSummaryTile: View {
+    let icon: String
+    let title: String
+    let value: String
+    let detail: String
+    let palette: ThemePalette
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(palette.accent)
+
+            Text(value)
+                .font(.system(size: 28, weight: .semibold, design: .serif))
+                .foregroundStyle(palette.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+
+            Text(title)
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundStyle(palette.textMuted)
+                .textCase(.uppercase)
+
+            Text(detail)
+                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .foregroundStyle(palette.textSecondary)
+        }
+        .frame(maxWidth: .infinity, minHeight: 148, alignment: .leading)
+        .principlePanel(palette)
+    }
+}
+
+private struct PrinciplesDailyMetric: Identifiable {
+    let id: Date
+    let date: Date
+    let completedCount: Int
+    let totalCount: Int
+
+    init(date: Date, completedCount: Int, totalCount: Int) {
+        id = date
+        self.date = date
+        self.completedCount = completedCount
+        self.totalCount = totalCount
+    }
+
+    var ratio: CGFloat {
+        guard totalCount > 0 else {
+            return 0
+        }
+
+        return CGFloat(completedCount) / CGFloat(totalCount)
+    }
+
+    var isToday: Bool {
+        Calendar.current.isDateInToday(date)
     }
 }
 

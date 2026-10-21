@@ -128,7 +128,8 @@ final class ThemeStore: ObservableObject {
     }
 
     private let defaults: UserDefaults
-    let historyOptions = [14, 21, 30]
+    let historyOptions = [3, 4, 5]
+    let defaultHistoryDays = 5
 
     @Published var appearance: AppAppearancePreference {
         didSet { save() }
@@ -145,7 +146,7 @@ final class ThemeStore: ObservableObject {
     @Published var visibleHistoryDays: Int {
         didSet {
             if !historyOptions.contains(visibleHistoryDays) {
-                visibleHistoryDays = 21
+                visibleHistoryDays = defaultHistoryDays
             }
             save()
         }
@@ -164,7 +165,7 @@ final class ThemeStore: ObservableObject {
         ) ?? .ember
 
         let storedHistory = defaults.integer(forKey: Key.visibleHistoryDays)
-        visibleHistoryDays = historyOptions.contains(storedHistory) ? storedHistory : 21
+        visibleHistoryDays = historyOptions.contains(storedHistory) ? storedHistory : defaultHistoryDays
     }
 
     var preferredColorScheme: ColorScheme? {
